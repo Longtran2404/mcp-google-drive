@@ -541,9 +541,99 @@ const tools: Tool[] = [
 ];
 
 // Tool implementations
+// Vietnamese text normalization utilities
+function removeVietnameseDiacritics(str: string): string {
+  const map: { [key: string]: string } = {
+    'à': 'a', 'á': 'a', 'ạ': 'a', 'ả': 'a', 'ã': 'a',
+    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ậ': 'a', 'ẩ': 'a', 'ẫ': 'a',
+    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ặ': 'a', 'ẳ': 'a', 'ẵ': 'a',
+    'è': 'e', 'é': 'e', 'ẹ': 'e', 'ẻ': 'e', 'ẽ': 'e',
+    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ệ': 'e', 'ể': 'e', 'ễ': 'e',
+    'ì': 'i', 'í': 'i', 'ị': 'i', 'ỉ': 'i', 'ĩ': 'i',
+    'ò': 'o', 'ó': 'o', 'ọ': 'o', 'ỏ': 'o', 'õ': 'o',
+    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ộ': 'o', 'ổ': 'o', 'ỗ': 'o',
+    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ợ': 'o', 'ở': 'o', 'ỡ': 'o',
+    'ù': 'u', 'ú': 'u', 'ụ': 'u', 'ủ': 'u', 'ũ': 'u',
+    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ự': 'u', 'ử': 'u', 'ữ': 'u',
+    'ỳ': 'y', 'ý': 'y', 'ỵ': 'y', 'ỷ': 'y', 'ỹ': 'y',
+    'đ': 'd',
+    'À': 'A', 'Á': 'A', 'Ạ': 'A', 'Ả': 'A', 'Ã': 'A',
+    'Â': 'A', 'Ầ': 'A', 'Ấ': 'A', 'Ậ': 'A', 'Ẩ': 'A', 'Ẫ': 'A',
+    'Ă': 'A', 'Ằ': 'A', 'Ắ': 'A', 'Ặ': 'A', 'Ẳ': 'A', 'Ẵ': 'A',
+    'È': 'E', 'É': 'E', 'Ẹ': 'E', 'Ẻ': 'E', 'Ẽ': 'E',
+    'Ê': 'E', 'Ề': 'E', 'Ế': 'E', 'Ệ': 'E', 'Ể': 'E', 'Ễ': 'E',
+    'Ì': 'I', 'Í': 'I', 'Ị': 'I', 'Ỉ': 'I', 'Ĩ': 'I',
+    'Ò': 'O', 'Ó': 'O', 'Ọ': 'O', 'Ỏ': 'O', 'Õ': 'O',
+    'Ô': 'O', 'Ồ': 'O', 'Ố': 'O', 'Ộ': 'O', 'Ổ': 'O', 'Ỗ': 'O',
+    'Ơ': 'O', 'Ờ': 'O', 'Ớ': 'O', 'Ợ': 'O', 'Ở': 'O', 'Ỡ': 'O',
+    'Ù': 'U', 'Ú': 'U', 'Ụ': 'U', 'Ủ': 'U', 'Ũ': 'U',
+    'Ư': 'U', 'Ừ': 'U', 'Ứ': 'U', 'Ự': 'U', 'Ử': 'U', 'Ữ': 'U',
+    'Ỳ': 'Y', 'Ý': 'Y', 'Ỵ': 'Y', 'Ỷ': 'Y', 'Ỹ': 'Y',
+    'Đ': 'D'
+  };
+  
+  return str.replace(/[^\u0000-\u007E]/g, (char) => map[char] || char);
+}
+
+function generateSearchVariations(searchTerm: string): string[] {
+  const variations = new Set<string>();
+  
+  // Original term
+  variations.add(searchTerm);
+  
+  // Case variations
+  variations.add(searchTerm.toLowerCase());
+  variations.add(searchTerm.toUpperCase());
+  variations.add(searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1).toLowerCase());
+  
+  // Without diacritics
+  const withoutDiacritics = removeVietnameseDiacritics(searchTerm);
+  variations.add(withoutDiacritics);
+  variations.add(withoutDiacritics.toLowerCase());
+  variations.add(withoutDiacritics.toUpperCase());
+  
+  // Split terms for partial matching
+  const words = searchTerm.split(/[\s\-_]+/).filter(w => w.length > 1);
+  words.forEach(word => {
+    variations.add(word);
+    variations.add(removeVietnameseDiacritics(word));
+  });
+  
+  return Array.from(variations);
+}
+
 async function searchFiles(args: z.infer<typeof SearchFilesSchema>) {
   try {
     log(`Searching files with args: ${JSON.stringify(args)}`, 'debug');
+    
+    // Check if the query looks like a file ID (length ~44 chars, alphanumeric with hyphens/underscores)
+    const fileIdPattern = /^[a-zA-Z0-9_-]{25,}$/;
+    if (fileIdPattern.test(args.query.trim())) {
+      log(`Query "${args.query}" looks like a file ID, attempting direct access`, 'info');
+      
+      try {
+        const fileResponse = await drive.files.get({
+          fileId: args.query.trim(),
+          fields: 'id,name,mimeType,modifiedTime,size,webViewLink,parents,description,owners,permissions',
+          supportsAllDrives: true,
+        });
+        
+        if (fileResponse.data) {
+          log(`Successfully found file by ID: ${fileResponse.data.name}`, 'info');
+          
+          return {
+            files: [fileResponse.data],
+            nextPageToken: null,
+            totalResults: 1,
+            query: args.query,
+            cached: false,
+            foundByFileId: true
+          };
+        }
+      } catch (fileIdError) {
+        log(`File ID access failed, falling back to search: ${fileIdError}`, 'debug');
+      }
+    }
     
     // Create cache key
     const cacheKey = `search:${JSON.stringify(args)}`;
@@ -555,49 +645,89 @@ async function searchFiles(args: z.infer<typeof SearchFilesSchema>) {
       return cachedResult;
     }
     
-    let query = args.query;
+    // Generate search variations for Vietnamese text
+    const searchVariations = generateSearchVariations(args.query);
+    log(`Generated ${searchVariations.length} search variations: ${searchVariations.join(', ')}`, 'debug');
+    
+    let allFoundFiles = new Map<string, any>(); // Use Map to avoid duplicates by ID
+    
+    // Try multiple search approaches
+    const searchApproaches = [
+      // Exact matches with variations
+      ...searchVariations.map(term => `name contains "${term}"`),
+      // Partial matches
+      ...searchVariations.map(term => `fullText contains "${term}"`),
+      // Without case sensitivity (Google Drive handles this automatically)
+      ...searchVariations.slice(0, 3).map(term => `name = "${term}"`)
+    ];
+    
+    // Add file type and trash filters to all approaches
+    const baseFilters: string[] = [];
     if (!args.includeTrashed) {
-      query += ' and trashed = false';
+      baseFilters.push('trashed = false');
     }
-
-    // Add file type filter if specified
     if (args.fileType) {
-      query += ` and mimeType='${args.fileType}'`;
+      baseFilters.push(`mimeType='${args.fileType}'`);
     }
-
+    
     const searchOperation = async () => {
-      const response = await drive.files.list({
-        q: query,
-        pageSize: args.maxResults,
-        fields:
-          'files(id,name,mimeType,modifiedTime,size,webViewLink,parents,description,owners,permissions),nextPageToken',
-        orderBy: args.orderBy || 'modifiedTime desc',
-        includeItemsFromAllDrives: true,
-        supportsAllDrives: true,
-      });
+      // Try each search approach
+      for (let i = 0; i < Math.min(searchApproaches.length, 5); i++) { // Limit to prevent too many API calls
+        const searchQuery = searchApproaches[i];
+        const fullQuery = baseFilters.length > 0 
+          ? `${searchQuery} and ${baseFilters.join(' and ')}`
+          : searchQuery;
+          
+        log(`Trying search query ${i + 1}: ${fullQuery}`, 'debug');
+        
+        try {
+          const response = await drive.files.list({
+            q: fullQuery,
+            pageSize: args.maxResults || 20,
+            fields: 'files(id,name,mimeType,modifiedTime,size,webViewLink,parents,description,owners,permissions),nextPageToken',
+            orderBy: args.orderBy || 'modifiedTime desc',
+            includeItemsFromAllDrives: true,
+            supportsAllDrives: true,
+          });
 
-      log(`Google Drive API search response received, status: ${response.status}`, 'debug');
-      log(`Response data structure: ${JSON.stringify(Object.keys(response.data || {}), null, 2)}`, 'debug');
-
-      // Comprehensive error checking
-      if (!response) {
-        throw new Error('No response from Google Drive API');
+          if (response.data?.files && Array.isArray(response.data.files)) {
+            response.data.files.forEach((file: any) => {
+              if (!allFoundFiles.has(file.id)) {
+                allFoundFiles.set(file.id, file);
+              }
+            });
+            
+            log(`Search query ${i + 1} found ${response.data.files.length} files`, 'debug');
+            
+            // If we found files and they seem relevant, we can break early
+            if (response.data.files.length > 0) {
+              const relevantFiles = response.data.files.filter((file: any) => 
+                searchVariations.some(term => 
+                  file.name.toLowerCase().includes(term.toLowerCase())
+                )
+              );
+              
+              if (relevantFiles.length > 0) {
+                log(`Found ${relevantFiles.length} highly relevant files, stopping search`, 'info');
+                break;
+              }
+            }
+          }
+        } catch (searchError) {
+          log(`Search query ${i + 1} failed: ${searchError}`, 'debug');
+          // Continue with next approach
+        }
       }
-      
-      if (!response.data) {
-        throw new Error('Google Drive API returned no data object');
-      }
 
-      // Handle different response structures
-      const files = Array.isArray(response.data.files) ? response.data.files : [];
-      
-      log(`Found ${files.length} files in search results`, 'info');
+      const files = Array.from(allFoundFiles.values());
+      log(`Total unique files found across all searches: ${files.length}`, 'info');
 
       const result = {
         files: files,
-        nextPageToken: response.data.nextPageToken || null,
+        nextPageToken: null, // We're combining results, so no pagination token
         totalResults: files.length,
-        query: query,
+        query: args.query,
+        searchVariations: searchVariations,
         cached: false
       };
 
