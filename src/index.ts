@@ -10,95 +10,74 @@ import {
 import { google } from 'googleapis';
 import { z } from 'zod';
 
-// Google Drive API setup with support for both OAuth2 and Service Account
+// Enhanced logging
+const log = (message: string, level: 'info' | 'error' | 'debug' = 'info') => {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] [${level.toUpperCase()}] MCP-Google-Drive: ${message}`;
+  
+  if (level === 'error') {
+    console.error(logMessage);
+  } else if (process.env.LOG_LEVEL === 'debug' || level === 'info') {
+    console.error(logMessage); // Use stderr for MCP logging
+  }
+};
+
+// Google Drive API setup with enhanced error handling
 let auth: any;
 let drive: any;
+let isInitialized = false;
 
 function initializeGoogleAuth() {
   try {
+    log('Initializing Google Drive authentication...', 'debug');
+    
     // Check if OAuth2 credentials are provided
     if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-      console.log('Using OAuth2 authentication...');
+      log('Using OAuth2 authentication...', 'info');
       
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
-        'urn:ietf:wg:oauth:2.0:oob' // For desktop applications
+        'urn:ietf:wg:oauth:2.0:oob'
       );
 
-      // For OAuth2, we'll need to handle the authorization flow
-      // For now, we'll use a simple approach with refresh token if available
       if (process.env.GOOGLE_REFRESH_TOKEN) {
         oauth2Client.setCredentials({
           refresh_token: process.env.GOOGLE_REFRESH_TOKEN
         });
         auth = oauth2Client;
+        log('OAuth2 authentication configured with refresh token', 'info');
       } else {
-        // Generate authorization URL for user to complete
-        const authUrl = oauth2Client.generateAuthUrl({
-          access_type: 'offline',
-          scope: [
-            'https://www.googleapis.com/auth/drive.readonly',
-            'https://www.googleapis.com/auth/drive.metadata.readonly',
-            'https://www.googleapis.com/auth/drive.file',
-          ],
-        });
-        
-        console.log('OAuth2 authorization required. Please visit this URL:');
-        console.log(authUrl);
-        console.log('After authorization, set GOOGLE_REFRESH_TOKEN environment variable.');
-        
-        // Fallback to service account if available
-        if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-          console.log('Falling back to Service Account authentication...');
-          
-          let credentials;
-          try {
-            // Try to parse as JSON if it's a JSON string
-            credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
-            auth = new google.auth.GoogleAuth({
-              credentials: credentials,
-              scopes: [
-                'https://www.googleapis.com/auth/drive.readonly',
-                'https://www.googleapis.com/auth/drive.metadata.readonly',
-                'https://www.googleapis.com/auth/drive.file',
-              ],
-            });
-          } catch (parseError) {
-            // If parsing fails, treat as file path
-            console.log('Treating GOOGLE_SERVICE_ACCOUNT_KEY as file path...');
-            auth = new google.auth.GoogleAuth({
-              keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
-              scopes: [
-                'https://www.googleapis.com/auth/drive.readonly',
-                'https://www.googleapis.com/auth/drive.metadata.readonly',
-                'https://www.googleapis.com/auth/drive.file',
-              ],
-            });
-          }
-        } else {
-          throw new Error('No valid authentication method available');
-        }
+        log('OAuth2 refresh token not provided, falling back to Service Account', 'info');
+        throw new Error('OAuth2 refresh token required');
       }
     } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-      // Use Service Account authentication
-      console.log('Using Service Account authentication...');
+      log('Using Service Account authentication...', 'info');
       
       let credentials;
       try {
         // Try to parse as JSON if it's a JSON string
-        credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
-        auth = new google.auth.GoogleAuth({
-          credentials: credentials,
-          scopes: [
-            'https://www.googleapis.com/auth/drive.readonly',
-            'https://www.googleapis.com/auth/drive.metadata.readonly',
-            'https://www.googleapis.com/auth/drive.file',
-          ],
-        });
+        const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+        
+        // Handle escaped newlines in private key
+        const cleanedKey = serviceAccountKey.replace(/\\n/g, '\n');
+        credentials = JSON.parse(cleanedKey);
+        
+        log('Successfully parsed Service Account credentials as JSON', 'debug');
+        
+        // Validate credentials structure
+        if (!credentials.private_key || !credentials.client_email) {
+          throw new Error('Invalid Service Account credentials structure');
+        }
+        
+        // Ensure private key is properly formatted
+        if (!credentials.private_key.includes('-----BEGIN PRIVATE KEY-----')) {
+          throw new Error('Invalid private key format');
+        }
+        
       } catch (parseError) {
+        log('Failed to parse Service Account credentials as JSON, treating as file path', 'debug');
         // If parsing fails, treat as file path
-        console.log('Treating GOOGLE_SERVICE_ACCOUNT_KEY as file path...');
         auth = new google.auth.GoogleAuth({
           keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
           scopes: [
@@ -107,21 +86,53 @@ function initializeGoogleAuth() {
             'https://www.googleapis.com/auth/drive.file',
           ],
         });
+        isInitialized = true;
+        log('Google Drive API initialized successfully with keyFile', 'info');
+        return;
       }
+      
+      auth = new google.auth.GoogleAuth({
+        credentials: credentials,
+        scopes: [
+          'https://www.googleapis.com/auth/drive.readonly',
+          'https://www.googleapis.com/auth/drive.metadata.readonly',
+          'https://www.googleapis.com/auth/drive.file',
+        ],
+      });
     } else {
       throw new Error('No authentication credentials provided. Please set either GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or GOOGLE_SERVICE_ACCOUNT_KEY');
     }
 
     drive = google.drive({ version: 'v3', auth });
-    console.log('Google Drive API initialized successfully');
+    isInitialized = true;
+    log('Google Drive API initialized successfully', 'info');
   } catch (error) {
-    console.error('Failed to initialize Google Drive API:', error);
+    log(`Failed to initialize Google Drive API: ${error}`, 'error');
     throw error;
   }
 }
 
+// Initialize authentication with retry
+let retryCount = 0;
+const maxRetries = 3;
+
+function initializeWithRetry() {
+  try {
+    initializeGoogleAuth();
+  } catch (error) {
+    retryCount++;
+    if (retryCount < maxRetries) {
+      log(`Authentication failed, retrying... (${retryCount}/${maxRetries})`, 'info');
+      setTimeout(initializeWithRetry, 1000 * retryCount);
+    } else {
+      log(`Authentication failed after ${maxRetries} attempts`, 'error');
+      throw error;
+    }
+  }
+}
+
 // Initialize authentication
-initializeGoogleAuth();
+initializeWithRetry();
 
 // Tool schemas
 const SearchFilesSchema = z.object({
@@ -470,6 +481,8 @@ const tools: Tool[] = [
 // Tool implementations
 async function searchFiles(args: z.infer<typeof SearchFilesSchema>) {
   try {
+    log(`Searching files with args: ${JSON.stringify(args)}`, 'debug');
+    
     let query = args.query;
     if (!args.includeTrashed) {
       query += ' and trashed = false';
@@ -485,12 +498,19 @@ async function searchFiles(args: z.infer<typeof SearchFilesSchema>) {
       supportsAllDrives: true,
     });
 
+    log(`Google Drive API search response: ${JSON.stringify(response.data)}`, 'debug');
+
+    if (!response.data) {
+      throw new Error('Google Drive API returned no data');
+    }
+
     return {
       files: response.data.files || [],
       nextPageToken: response.data.nextPageToken,
       totalResults: response.data.files?.length || 0,
     };
   } catch (error) {
+    log(`Failed to search files: ${error}`, 'error');
     throw new Error(`Failed to search files: ${error}`);
   }
 }
@@ -534,6 +554,8 @@ async function getFile(args: z.infer<typeof GetFileSchema>) {
 
 async function listFiles(args: z.infer<typeof ListFilesSchema>) {
   try {
+    log(`Listing files with args: ${JSON.stringify(args)}`, 'debug');
+    
     const response = await drive.files.list({
       pageSize: args.pageSize,
       pageToken: args.pageToken,
@@ -546,12 +568,19 @@ async function listFiles(args: z.infer<typeof ListFilesSchema>) {
       supportsAllDrives: true,
     });
 
+    log(`Google Drive API response: ${JSON.stringify(response.data)}`, 'debug');
+
+    if (!response.data) {
+      throw new Error('Google Drive API returned no data');
+    }
+
     return {
       files: response.data.files || [],
       nextPageToken: response.data.nextPageToken,
       totalResults: response.data.files?.length || 0,
     };
   } catch (error) {
+    log(`Failed to list files: ${error}`, 'error');
     throw new Error(`Failed to list files: ${error}`);
   }
 }
@@ -850,64 +879,108 @@ async function getFileRevisions(args: z.infer<typeof GetFileRevisionsSchema>) {
   }
 }
 
-// MCP Server setup
+// MCP Server setup with enhanced error handling
 const server = new Server({
   name: 'mcp-google-drive-server',
-  version: '1.0.0',
+  version: '1.4.1',
   capabilities: {
     tools: {},
   },
 });
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools,
-}));
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  log('ListTools request received', 'debug');
+  return { tools };
+});
 
 server.setRequestHandler(CallToolRequestSchema, async request => {
   const { name, arguments: args } = request.params;
 
+  // Check if authentication is ready
+  if (!isInitialized) {
+    log('Authentication not ready, waiting...', 'debug');
+    // Wait for authentication to complete
+    let waitCount = 0;
+    while (!isInitialized && waitCount < 30) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      waitCount++;
+    }
+    
+    if (!isInitialized) {
+      throw new Error('Authentication not ready after 3 seconds');
+    }
+  }
+
+  log(`Tool call: ${name}`, 'debug');
+
   try {
+    let result;
     switch (name) {
       case 'search_files':
-        return await searchFiles(SearchFilesSchema.parse(args));
+        result = await searchFiles(SearchFilesSchema.parse(args));
+        break;
       case 'get_file':
-        return await getFile(GetFileSchema.parse(args));
+        result = await getFile(GetFileSchema.parse(args));
+        break;
       case 'list_files':
-        return await listFiles(ListFilesSchema.parse(args));
+        result = await listFiles(ListFilesSchema.parse(args));
+        break;
       case 'get_file_content':
-        return await getFileContent(GetFileContentSchema.parse(args));
+        result = await getFileContent(GetFileContentSchema.parse(args));
+        break;
       case 'create_file':
-        return await createFile(CreateFileSchema.parse(args));
+        result = await createFile(CreateFileSchema.parse(args));
+        break;
       case 'update_file':
-        return await updateFile(UpdateFileSchema.parse(args));
+        result = await updateFile(UpdateFileSchema.parse(args));
+        break;
       case 'delete_file':
-        return await deleteFile(DeleteFileSchema.parse(args));
+        result = await deleteFile(DeleteFileSchema.parse(args));
+        break;
       case 'copy_file':
-        return await copyFile(CopyFileSchema.parse(args));
+        result = await copyFile(CopyFileSchema.parse(args));
+        break;
       case 'move_file':
-        return await moveFile(MoveFileSchema.parse(args));
+        result = await moveFile(MoveFileSchema.parse(args));
+        break;
       case 'create_folder':
-        return await createFolder(CreateFolderSchema.parse(args));
+        result = await createFolder(CreateFolderSchema.parse(args));
+        break;
       case 'get_file_permissions':
-        return await getFilePermissions(GetFilePermissionsSchema.parse(args));
+        result = await getFilePermissions(GetFilePermissionsSchema.parse(args));
+        break;
       case 'share_file':
-        return await shareFile(ShareFileSchema.parse(args));
+        result = await shareFile(ShareFileSchema.parse(args));
+        break;
       case 'get_drive_info':
-        return await getDriveInfo(GetDriveInfoSchema.parse(args));
+        result = await getDriveInfo(GetDriveInfoSchema.parse(args));
+        break;
       case 'list_shared_drives':
-        return await listSharedDrives(ListSharedDrivesSchema.parse(args));
+        result = await listSharedDrives(ListSharedDrivesSchema.parse(args));
+        break;
       case 'get_file_revisions':
-        return await getFileRevisions(GetFileRevisionsSchema.parse(args));
+        result = await getFileRevisions(GetFileRevisionsSchema.parse(args));
+        break;
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
+    
+    log(`Tool ${name} executed successfully`, 'debug');
+    return result;
   } catch (error) {
+    log(`Tool ${name} failed: ${error}`, 'error');
     throw new Error(`Tool execution failed: ${error}`);
   }
 });
 
-// Start server
-const transport = new StdioServerTransport();
-await server.connect(transport);
-
-console.error('MCP Google Drive server started with enhanced features'); // eslint-disable-line no-undef
+// Start server with error handling
+try {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  
+  log('MCP Google Drive server started successfully', 'info');
+  log('Server ready to handle requests', 'info');
+} catch (error) {
+  log(`Failed to start MCP server: ${error}`, 'error');
+  process.exit(1);
+}
