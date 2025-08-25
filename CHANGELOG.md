@@ -5,119 +5,117 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.2] - 2024-12-19
+## [1.3.3] - 2024-12-XX
 
 ### Added
-- **Executable Support**: Added `bin` field to package.json for CLI usage
-- **Shebang**: Added `#!/usr/bin/env node` to make the package executable
-- **CLI Compatibility**: Package can now be run directly with `npx mcp-google-drive`
 
-### Fixed
-- **MCP Integration**: Package now works properly with Cursor MCP configuration
-- **Executable Issues**: Resolved npm executable detection problems
+- **Enhanced Cursor MCP Integration**: Improved automatic startup and configuration
+- **Better Error Handling**: More detailed error messages and logging
+- **Cursor Integration Guide**: Comprehensive troubleshooting guide for Cursor users
+- **MCP Configuration Templates**: Ready-to-use MCP configuration examples
 
 ### Changed
-- Updated package version to 1.3.2
-- Enhanced package structure for better MCP server integration
 
-## [1.3.1] - 2024-12-19
+- **MCP Configuration**: Added `MCP_MODE`, `LOG_LEVEL`, and `cwd` parameters
+- **README**: Updated with Cursor integration instructions and troubleshooting
+- **Documentation**: Added `CURSOR_INTEGRATION.md` with detailed setup guide
 
 ### Fixed
-- **Critical**: Fixed broken GitHub URLs in package.json and documentation
-- Updated all repository URLs from `minhlong244` to `Longtran2404`
-- Fixed 404 errors in npm package documentation links
-- Corrected GitHub repository, issues, and homepage URLs
 
-### Changed
-- Updated package version to 1.3.1
-- Fixed broken links in README.md and package.json
-- Ensured all documentation links point to correct GitHub repository
+- **Cursor Integration Issues**: Resolved problems with MCP server not auto-starting
+- **Configuration Problems**: Fixed MCP server configuration for better Cursor compatibility
+- **Startup Issues**: Improved automatic MCP server startup in Cursor
 
-## [1.3.0] - 2024-12-19
+## [1.3.2] - 2024-12-XX
 
 ### Added
-- GitHub Release v1.2.0 with comprehensive release notes
-- Enhanced package metadata and npm discoverability
-- Improved documentation structure and organization
+
+- **Executable Package**: Added `bin` field and shebang for direct execution
+- **Enhanced Error Handling**: Better error messages and validation
+- **Type Safety Improvements**: Replaced `any` types with proper TypeScript types
 
 ### Changed
-- Updated package version to 1.3.0
-- Enhanced npm package information and keywords
-- Improved GitHub repository organization
+
+- **Package Structure**: Optimized for better npm distribution
+- **Build Process**: Improved TypeScript compilation and build scripts
+- **Documentation**: Updated README with better usage examples
+
+### Fixed
+
+- **ESLint Issues**: Resolved linting errors and warnings
+- **TypeScript Compatibility**: Fixed type-related issues
+- **Build Process**: Streamlined build and development workflow
+
+## [1.3.1] - 2024-12-XX
+
+### Added
+
+- **Google Service Account Setup Guide**: Comprehensive setup instructions
+- **Enhanced Documentation**: Better README and API documentation
+- **Development Scripts**: Additional npm scripts for development
+
+### Changed
+
+- **Package Name**: Renamed from `@minhlong244/mcp-google-drive` to `mcp-google-drive`
+- **Repository URLs**: Updated to reflect new GitHub organization
+- **Documentation**: Improved setup and usage instructions
 
 ### Removed
-- Cleaned up unnecessary deployment and security documentation files
-- Removed unused configuration files to focus on core functionality
-- Streamlined project structure for better maintainability
 
-### Documentation
-- Added comprehensive release notes for v1.2.0
-- Enhanced package description and metadata
-- Updated all documentation links and references
+- **Unnecessary Files**: Removed deployment, security, and contributing docs
+- **Old Configuration**: Cleaned up outdated configuration files
 
-## [1.2.0] - 2024-12-19
+## [1.3.0] - 2024-12-XX
 
 ### Added
-- GitHub Release v1.1.0 with comprehensive release notes
-- Enhanced package metadata and npm discoverability
-- Improved documentation structure and organization
+
+- **Full CRUD Operations**: Create, read, update, delete files and folders
+- **Advanced Search**: Google Drive syntax search with filters
+- **File Management**: Copy, move, rename, and organize files
+- **Permission Management**: File sharing and access control
+- **Shared Drives Support**: Enterprise drive management
+- **File Revisions**: Version history tracking
+- **Multi-format Export**: Support for various file formats
+- **TypeScript Support**: Full TypeScript implementation
+- **Zod Validation**: Input validation and error handling
 
 ### Changed
-- Updated package version to 1.2.0
-- Enhanced npm package information and keywords
-- Improved GitHub repository organization
 
-### Removed
-- Cleaned up unnecessary deployment and security documentation files
-- Removed unused configuration files to focus on core functionality
-- Streamlined project structure for better maintainability
+- **Complete Rewrite**: Modern TypeScript implementation
+- **MCP Protocol**: Updated to latest MCP specification
+- **Google APIs**: Latest Google Drive API integration
+- **Error Handling**: Comprehensive error handling and logging
 
-### Documentation
-- Added comprehensive release notes for v1.1.0
-- Enhanced package description and metadata
-- Updated all documentation links and references
-
-## [1.1.0] - 2024-12-19
+## [1.2.0] - 2024-12-XX
 
 ### Added
-- Comprehensive Google Service Account setup guide (`GOOGLE_SERVICE_ACCOUNT_SETUP.md`)
-- Enhanced TypeScript type safety with proper type definitions
-- Improved ESLint configuration for better code quality
 
-### Fixed
-- ESLint linting errors for `process`, `console`, and `Buffer` globals
-- Replaced `any` types with proper TypeScript types (`Record<string, string>`)
-- Added ESLint disable comments for Node.js globals
-- Fixed TypeScript compilation issues
+- **Basic File Operations**: File listing and basic management
+- **Google Drive API**: Initial integration with Google Drive
+- **MCP Server**: Basic MCP server implementation
 
 ### Changed
-- Updated package.json to include new documentation files
-- Enhanced keywords for better npm discoverability
-- Improved project metadata and descriptions
 
-### Security
-- Added security best practices documentation
-- Included troubleshooting guide for common setup issues
-- Added API quota and limits information
+- **Architecture**: Improved server architecture and performance
+- **Error Handling**: Better error handling and user feedback
 
-## [1.0.0] - 2024-12-19
+## [1.1.0] - 2024-12-XX
 
 ### Added
-- Initial release of MCP Google Drive Server
-- Full CRUD operations for Google Drive files
-- File search and metadata retrieval
-- File sharing and permission management
-- Support for shared drives and file revisions
-- Comprehensive error handling and validation
-- TypeScript support with Zod schema validation
-- Google Drive API v3 integration
 
-### Features
-- Search files with advanced query options
-- Get file content with MIME type support
-- Create, update, and delete files
-- Copy and move files between folders
-- Create folders with descriptions
-- Manage file permissions and sharing
-- List shared drives and file revisions
-- Support for all Google Drive file types
+- **Initial Release**: Basic MCP server functionality
+- **Google Drive Integration**: Basic file operations
+- **TypeScript Support**: Initial TypeScript implementation
+
+### Changed
+
+- **Project Structure**: Organized project structure
+- **Documentation**: Basic README and setup instructions
+
+## [1.0.0] - 2024-12-XX
+
+### Added
+
+- **Project Initialization**: Initial project setup
+- **Basic MCP Server**: Foundation for MCP server development
+- **Development Environment**: TypeScript, ESLint, and build tools setup

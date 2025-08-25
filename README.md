@@ -1,155 +1,144 @@
-# MCP Google Drive Server
+# MCP Google Drive
 
-Advanced MCP (Model Context Protocol) server for Google Drive integration with full CRUD operations, file management, and sharing capabilities.
+Advanced MCP server for Google Drive integration with full CRUD operations, file management, and sharing capabilities.
 
-## 🚀 Features
+## ✨ Features
 
-- **16 Powerful Tools** for comprehensive Google Drive management
-- **Full CRUD Operations** for files and folders
-- **Advanced Search** with Google Drive syntax and filters
-- **Permission Management** and file sharing
-- **Shared Drives Support** for enterprise environments
-- **File Revision History** tracking
-- **Multi-format Export** capabilities
-- **Folder Management** and organization
-- **File Operations** (copy, move, rename)
-- **Security Features** with service account authentication
+- **File Management**: Create, read, update, delete files and folders
+- **Search & Discovery**: Advanced search with multiple criteria
+- **Sharing & Permissions**: Manage file sharing and access control
+- **Content Operations**: Upload, download, and modify file content
+- **Drive Operations**: List drives, manage shared drives
+- **Type Safety**: Full TypeScript support with Zod validation
+- **Error Handling**: Comprehensive error handling and logging
 
-## 📋 Prerequisites
+## 🚀 Quick Setup
 
-- Node.js 18.0.0 or higher
-- Google Cloud Platform account
-- Google Drive API enabled
-- Service account credentials
+### Prerequisites
 
-## 🛠️ Installation
+- Node.js 18+
+- Google Service Account with Drive API enabled
+- Service Account JSON key file
+
+### Installation
 
 ```bash
 npm install mcp-google-drive
 ```
 
-## ⚙️ Quick Setup
+### Environment Setup
 
-1. **Install the package:**
+Set your Google Service Account credentials:
 
-   ```bash
-   npm install mcp-google-drive
-   ```
+```bash
+export GOOGLE_SERVICE_ACCOUNT_KEY='{"type":"service_account",...}'
+```
 
-2. **Set up Google Service Account:**
-   - Follow the comprehensive guide: [GOOGLE_SERVICE_ACCOUNT_SETUP.md](./GOOGLE_SERVICE_ACCOUNT_SETUP.md)
-   - Download your service account key JSON file
-   - Set environment variable: `GOOGLE_SERVICE_ACCOUNT_KEY=./path/to/key.json`
+## 🔧 Cursor MCP Integration
 
-3. **Configure MCP client:**
-   ```json
-   {
-     "mcpServers": {
-       "google-drive": {
-         "command": "npx",
-         "args": ["mcp-google-drive-server"],
-         "env": {
-           "GOOGLE_SERVICE_ACCOUNT_KEY": "./google-service-account-key.json"
-         }
-       }
-     }
-   }
-   ```
+### Automatic Integration
 
-## 🔧 Available Tools
+The MCP server is designed to work seamlessly with Cursor. Add this configuration to your `~/.cursor/mcp.json`:
 
-### File Management
+```json
+{
+  "mcpServers": {
+    "mcp-google-drive": {
+      "command": "npx",
+      "args": ["mcp-google-drive@1.3.2"],
+      "env": {
+        "GOOGLE_SERVICE_ACCOUNT_KEY": "your-service-account-json",
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "info",
+        "DISABLE_CONSOLE_OUTPUT": "false"
+      },
+      "cwd": "/path/to/your/project"
+    }
+  }
+}
+```
 
-- `search_files` - Advanced file search with filters
-- `list_files` - List files with pagination
+### Troubleshooting Cursor Integration
+
+If MCP tools are not working in Cursor:
+
+1. **Restart Cursor** after updating `mcp.json`
+2. **Check MCP Status**: Command Palette → "MCP: Show Servers"
+3. **Verify Connection**: Command Palette → "MCP: Test Connection"
+4. **Check Logs**: Look for MCP server startup messages
+
+### Manual Server Start
+
+If automatic integration fails, you can start the server manually:
+
+```bash
+# In your project directory
+npm run start
+
+# Or globally
+npx mcp-google-drive
+```
+
+## 🛠️ Available Tools
+
+### File Operations
+
+- `search_files` - Search files with advanced criteria
 - `get_file` - Get file metadata and content
-- `create_file` - Create new files
-- `update_file` - Update existing files
-- `delete_file` - Delete or trash files
+- `create_file` - Create new files and folders
+- `update_file` - Update file content and metadata
+- `delete_file` - Delete files and folders
 - `copy_file` - Copy files to new locations
 - `move_file` - Move files between folders
 
-### Folder Operations
+### Drive Management
 
-- `create_folder` - Create new folders
-- `list_folders` - List folder contents
+- `get_drive_info` - Get drive information
+- `list_shared_drives` - List available shared drives
 
 ### Sharing & Permissions
 
-- `get_file_permissions` - View file permissions
+- `get_file_permissions` - Get file sharing settings
 - `share_file` - Share files with users
-- `get_drive_info` - Get drive information
+- `get_file_revisions` - Get file version history
 
-### Advanced Features
+## 📚 Documentation
 
-- `get_file_content` - Export files to different formats
-- `list_shared_drives` - Work with enterprise drives
-- `get_file_revisions` - Track file version history
-
-## 📖 Documentation
-
-- **[Google Service Account Setup](./GOOGLE_SERVICE_ACCOUNT_SETUP.md)** - Complete setup guide
-- **[API Reference](./docs/API.md)** - Detailed tool documentation
-- **[Examples](./examples/)** - Usage examples and patterns
-- **[Troubleshooting](./docs/TROUBLESHOOTING.md)** - Common issues and solutions
-
-## 🔒 Security
-
-- Service account authentication
-- Minimal required permissions
-- Secure error messages
-- Input validation and sanitization
-- No user data storage or logging
+- [Google Drive API Reference](https://developers.google.com/drive/api/reference/rest/v3)
+- [MCP Protocol Specification](https://modelcontextprotocol.io/)
+- [Service Account Setup Guide](./GOOGLE_SERVICE_ACCOUNT_SETUP.md)
 
 ## 🧪 Development
 
+### Build
+
 ```bash
-# Clone repository
-git clone https://github.com/Longtran2404/mcp-google-drive.git
-cd mcp-google-drive
-
-# Install dependencies
-npm install
-
-# Run in development mode
-npm run dev
-
-# Build for production
 npm run build
-
-# Run linter
-npm run lint
-
-# Format code
-npm run format
 ```
 
-## 📝 License
+### Development Mode
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```bash
+npm run dev
+```
+
+### Linting
+
+```bash
+npm run lint
+npm run lint:fix
+```
+
+## 📄 License
+
+MIT License - see [LICENSE](./LICENSE) for details.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
+Contributions welcome! Please read our contributing guidelines and submit pull requests.
 
-## 🐛 Issues & Support
+## 📞 Support
 
-- **Bug Reports**: [GitHub Issues](https://github.com/Longtran2404/mcp-google-drive/issues)
-- **Feature Requests**: [GitHub Discussions](https://github.com/Longtran2404/mcp-google-drive/discussions)
-- **Documentation**: [GitHub Wiki](https://github.com/Longtran2404/mcp-google-drive/wiki)
-
-## 📊 Version History
-
-See [CHANGELOG.md](CHANGELOG.md) for a complete list of changes and versions.
-
-## 🙏 Acknowledgments
-
-- [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) team
-- [Google Drive API](https://developers.google.com/drive) documentation
-- [Google Cloud Platform](https://cloud.google.com/) services
-- [TypeScript](https://www.typescriptlang.org/) community
-- [Zod](https://zod.dev/) for schema validation
-
----
-
-**Made with ❤️ by the MCP Google Drive Team**
+- **Issues**: [GitHub Issues](https://github.com/Longtran2404/mcp-google-drive/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Longtran2404/mcp-google-drive/discussions)
+- **Documentation**: [README](./README.md) and [Setup Guide](./GOOGLE_SERVICE_ACCOUNT_SETUP.md)

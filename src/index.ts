@@ -10,17 +10,118 @@ import {
 import { google } from 'googleapis';
 import { z } from 'zod';
 
-// Google Drive API setup
-const auth = new google.auth.GoogleAuth({
-  keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY, // eslint-disable-line no-undef
-  scopes: [
-    'https://www.googleapis.com/auth/drive.readonly',
-    'https://www.googleapis.com/auth/drive.metadata.readonly',
-    'https://www.googleapis.com/auth/drive.file',
-  ],
-});
+// Google Drive API setup with support for both OAuth2 and Service Account
+let auth: any;
+let drive: any;
 
-const drive = google.drive({ version: 'v3', auth });
+function initializeGoogleAuth() {
+  try {
+    // Check if OAuth2 credentials are provided
+    if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+      console.log('Using OAuth2 authentication...');
+      
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        'urn:ietf:wg:oauth:2.0:oob' // For desktop applications
+      );
+
+      // For OAuth2, we'll need to handle the authorization flow
+      // For now, we'll use a simple approach with refresh token if available
+      if (process.env.GOOGLE_REFRESH_TOKEN) {
+        oauth2Client.setCredentials({
+          refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+        });
+        auth = oauth2Client;
+      } else {
+        // Generate authorization URL for user to complete
+        const authUrl = oauth2Client.generateAuthUrl({
+          access_type: 'offline',
+          scope: [
+            'https://www.googleapis.com/auth/drive.readonly',
+            'https://www.googleapis.com/auth/drive.metadata.readonly',
+            'https://www.googleapis.com/auth/drive.file',
+          ],
+        });
+        
+        console.log('OAuth2 authorization required. Please visit this URL:');
+        console.log(authUrl);
+        console.log('After authorization, set GOOGLE_REFRESH_TOKEN environment variable.');
+        
+        // Fallback to service account if available
+        if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+          console.log('Falling back to Service Account authentication...');
+          
+          let credentials;
+          try {
+            // Try to parse as JSON if it's a JSON string
+            credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+            auth = new google.auth.GoogleAuth({
+              credentials: credentials,
+              scopes: [
+                'https://www.googleapis.com/auth/drive.readonly',
+                'https://www.googleapis.com/auth/drive.metadata.readonly',
+                'https://www.googleapis.com/auth/drive.file',
+              ],
+            });
+          } catch (parseError) {
+            // If parsing fails, treat as file path
+            console.log('Treating GOOGLE_SERVICE_ACCOUNT_KEY as file path...');
+            auth = new google.auth.GoogleAuth({
+              keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
+              scopes: [
+                'https://www.googleapis.com/auth/drive.readonly',
+                'https://www.googleapis.com/auth/drive.metadata.readonly',
+                'https://www.googleapis.com/auth/drive.file',
+              ],
+            });
+          }
+        } else {
+          throw new Error('No valid authentication method available');
+        }
+      }
+    } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+      // Use Service Account authentication
+      console.log('Using Service Account authentication...');
+      
+      let credentials;
+      try {
+        // Try to parse as JSON if it's a JSON string
+        credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+        auth = new google.auth.GoogleAuth({
+          credentials: credentials,
+          scopes: [
+            'https://www.googleapis.com/auth/drive.readonly',
+            'https://www.googleapis.com/auth/drive.metadata.readonly',
+            'https://www.googleapis.com/auth/drive.file',
+          ],
+        });
+      } catch (parseError) {
+        // If parsing fails, treat as file path
+        console.log('Treating GOOGLE_SERVICE_ACCOUNT_KEY as file path...');
+        auth = new google.auth.GoogleAuth({
+          keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
+          scopes: [
+            'https://www.googleapis.com/auth/drive.readonly',
+            'https://www.googleapis.com/auth/drive.metadata.readonly',
+            'https://www.googleapis.com/auth/drive.file',
+          ],
+        });
+      }
+    } else {
+      throw new Error('No authentication credentials provided. Please set either GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or GOOGLE_SERVICE_ACCOUNT_KEY');
+    }
+
+    drive = google.drive({ version: 'v3', auth });
+    console.log('Google Drive API initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize Google Drive API:', error);
+    throw error;
+  }
+}
+
+// Initialize authentication
+initializeGoogleAuth();
 
 // Tool schemas
 const SearchFilesSchema = z.object({
