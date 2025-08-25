@@ -31,6 +31,7 @@ npm install mcp-google-drive
 ## ⚙️ Quick Setup
 
 1. **Install the package:**
+
    ```bash
    npm install mcp-google-drive
    ```
@@ -58,6 +59,7 @@ npm install mcp-google-drive
 ## 🔧 Available Tools
 
 ### File Management
+
 - `search_files` - Advanced file search with filters
 - `list_files` - List files with pagination
 - `get_file` - Get file metadata and content
@@ -68,15 +70,18 @@ npm install mcp-google-drive
 - `move_file` - Move files between folders
 
 ### Folder Operations
+
 - `create_folder` - Create new folders
 - `list_folders` - List folder contents
 
 ### Sharing & Permissions
+
 - `get_file_permissions` - View file permissions
 - `share_file` - Share files with users
 - `get_drive_info` - Get drive information
 
 ### Advanced Features
+
 - `get_file_content` - Export files to different formats
 - `list_shared_drives` - Work with enterprise drives
 - `get_file_revisions` - Track file version history

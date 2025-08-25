@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2024-12-19
+
+### Added
+- **Executable Support**: Added `bin` field to package.json for CLI usage
+- **Shebang**: Added `#!/usr/bin/env node` to make the package executable
+- **CLI Compatibility**: Package can now be run directly with `npx mcp-google-drive`
+
+### Fixed
+- **MCP Integration**: Package now works properly with Cursor MCP configuration
+- **Executable Issues**: Resolved npm executable detection problems
+
+### Changed
+- Updated package version to 1.3.2
+- Enhanced package structure for better MCP server integration
+
 ## [1.3.1] - 2024-12-19
 
 ### Fixed
