@@ -504,10 +504,11 @@ async function searchFiles(args: z.infer<typeof SearchFilesSchema>) {
       throw new Error('Google Drive API returned no data');
     }
 
+    const files = response.data.files || [];
     return {
-      files: response.data.files || [],
+      files: files,
       nextPageToken: response.data.nextPageToken,
-      totalResults: response.data.files?.length || 0,
+      totalResults: files.length,
     };
   } catch (error) {
     log(`Failed to search files: ${error}`, 'error');
