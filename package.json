@@ -58,12 +58,5 @@
     "rimraf": "^5.0.5",
     "tsx": "^4.6.0",
     "typescript": "^5.3.0"
-  },
-  "files": [
-    "dist/**/*",
-    "README.md",
-    "LICENSE",
-    "CHANGELOG.md",
-    "GOOGLE_SERVICE_ACCOUNT_SETUP.md"
-  ]
+  }
 }

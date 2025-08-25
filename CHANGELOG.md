@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced npm package information and keywords
 - Improved GitHub repository organization
 
+### Removed
+- Cleaned up unnecessary deployment and security documentation files
+- Removed unused configuration files to focus on core functionality
+- Streamlined project structure for better maintainability
+
 ### Documentation
 - Added comprehensive release notes for v1.1.0
 - Enhanced package description and metadata
