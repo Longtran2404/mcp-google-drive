@@ -100,7 +100,7 @@ npm install mcp-google-drive
 
 ```bash
 # Clone repository
-git clone https://github.com/minhlong244/mcp-google-drive.git
+git clone https://github.com/Longtran2404/mcp-google-drive.git
 cd mcp-google-drive
 
 # Install dependencies
@@ -129,9 +129,9 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 ## 🐛 Issues & Support
 
-- **Bug Reports**: [GitHub Issues](https://github.com/minhlong244/mcp-google-drive/issues)
-- **Feature Requests**: [GitHub Discussions](https://github.com/minhlong244/mcp-google-drive/discussions)
-- **Documentation**: [GitHub Wiki](https://github.com/minhlong244/mcp-google-drive/wiki)
+- **Bug Reports**: [GitHub Issues](https://github.com/Longtran2404/mcp-google-drive/issues)
+- **Feature Requests**: [GitHub Discussions](https://github.com/Longtran2404/mcp-google-drive/discussions)
+- **Documentation**: [GitHub Wiki](https://github.com/Longtran2404/mcp-google-drive/wiki)
 
 ## 📊 Version History
 
