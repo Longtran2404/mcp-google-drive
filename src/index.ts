@@ -27,6 +27,60 @@ let auth: any;
 let drive: any;
 let isInitialized = false;
 
+// Retry utility with exponential backoff
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelay: number = 1000
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      if (attempt === maxRetries) {
+        throw error;
+      }
+
+      // Check if error is retryable (rate limits, network issues)
+      const isRetryable = error.code === 403 || error.code === 429 || error.code === 500 || 
+                         error.code === 502 || error.code === 503 || error.code === 504 ||
+                         error.message?.includes('rate limit') || error.message?.includes('quota');
+
+      if (!isRetryable) {
+        throw error;
+      }
+
+      const delay = initialDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
+      log(`Attempt ${attempt} failed, retrying in ${Math.round(delay)}ms: ${error.message}`, 'debug');
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
+// Simple in-memory cache for frequently accessed data
+const cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+
+function getCachedData(key: string): any | null {
+  const cached = cache.get(key);
+  if (!cached) return null;
+  
+  if (Date.now() - cached.timestamp > cached.ttl) {
+    cache.delete(key);
+    return null;
+  }
+  
+  return cached.data;
+}
+
+function setCachedData(key: string, data: any, ttl: number = 300000): void { // 5 minutes default
+  cache.set(key, {
+    data,
+    timestamp: Date.now(),
+    ttl
+  });
+}
+
 function initializeGoogleAuth() {
   try {
     log('Initializing Google Drive authentication...', 'debug');
@@ -103,9 +157,7 @@ function initializeGoogleAuth() {
       throw new Error('No authentication credentials provided. Please set either GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or GOOGLE_SERVICE_ACCOUNT_KEY');
     }
 
-    drive = google.drive({ version: 'v3', auth });
-    isInitialized = true;
-    log('Google Drive API initialized successfully', 'info');
+    log('Google Drive authentication configured successfully', 'info');
   } catch (error) {
     log(`Failed to initialize Google Drive API: ${error}`, 'error');
     throw error;
@@ -116,14 +168,18 @@ function initializeGoogleAuth() {
 let retryCount = 0;
 const maxRetries = 3;
 
-function initializeWithRetry() {
+async function initializeWithRetry() {
   try {
     initializeGoogleAuth();
+    drive = google.drive({ version: 'v3', auth });
+    isInitialized = true;
+    log('Google Drive API fully initialized', 'info');
   } catch (error) {
     retryCount++;
     if (retryCount < maxRetries) {
       log(`Authentication failed, retrying... (${retryCount}/${maxRetries})`, 'info');
-      setTimeout(initializeWithRetry, 1000 * retryCount);
+      await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+      return initializeWithRetry();
     } else {
       log(`Authentication failed after ${maxRetries} attempts`, 'error');
       throw error;
@@ -131,8 +187,14 @@ function initializeWithRetry() {
   }
 }
 
-// Initialize authentication
-initializeWithRetry();
+// Initialize authentication immediately when module loads
+(async () => {
+  try {
+    await initializeWithRetry();
+  } catch (error) {
+    log(`Critical: Failed to initialize Google Drive API: ${error}`, 'error');
+  }
+})();
 
 // Tool schemas
 const SearchFilesSchema = z.object({
@@ -483,33 +545,71 @@ async function searchFiles(args: z.infer<typeof SearchFilesSchema>) {
   try {
     log(`Searching files with args: ${JSON.stringify(args)}`, 'debug');
     
+    // Create cache key
+    const cacheKey = `search:${JSON.stringify(args)}`;
+    
+    // Check cache first for non-real-time queries
+    const cachedResult = getCachedData(cacheKey);
+    if (cachedResult && !args.query.includes('modifiedTime')) {
+      log('Returning cached search result', 'debug');
+      return cachedResult;
+    }
+    
     let query = args.query;
     if (!args.includeTrashed) {
       query += ' and trashed = false';
     }
 
-    const response = await drive.files.list({
-      q: query,
-      pageSize: args.maxResults,
-      fields:
-        'files(id,name,mimeType,modifiedTime,size,webViewLink,parents,description,owners,permissions)',
-      orderBy: args.orderBy || 'modifiedTime desc',
-      includeItemsFromAllDrives: true,
-      supportsAllDrives: true,
-    });
-
-    log(`Google Drive API search response: ${JSON.stringify(response.data)}`, 'debug');
-
-    if (!response.data) {
-      throw new Error('Google Drive API returned no data');
+    // Add file type filter if specified
+    if (args.fileType) {
+      query += ` and mimeType='${args.fileType}'`;
     }
 
-    const files = response.data.files || [];
-    return {
-      files: files,
-      nextPageToken: response.data.nextPageToken,
-      totalResults: files.length,
+    const searchOperation = async () => {
+      const response = await drive.files.list({
+        q: query,
+        pageSize: args.maxResults,
+        fields:
+          'files(id,name,mimeType,modifiedTime,size,webViewLink,parents,description,owners,permissions),nextPageToken',
+        orderBy: args.orderBy || 'modifiedTime desc',
+        includeItemsFromAllDrives: true,
+        supportsAllDrives: true,
+      });
+
+      log(`Google Drive API search response received, status: ${response.status}`, 'debug');
+      log(`Response data structure: ${JSON.stringify(Object.keys(response.data || {}), null, 2)}`, 'debug');
+
+      // Comprehensive error checking
+      if (!response) {
+        throw new Error('No response from Google Drive API');
+      }
+      
+      if (!response.data) {
+        throw new Error('Google Drive API returned no data object');
+      }
+
+      // Handle different response structures
+      const files = Array.isArray(response.data.files) ? response.data.files : [];
+      
+      log(`Found ${files.length} files in search results`, 'info');
+
+      const result = {
+        files: files,
+        nextPageToken: response.data.nextPageToken || null,
+        totalResults: files.length,
+        query: query,
+        cached: false
+      };
+
+      // Cache the result if successful
+      if (files.length >= 0) {
+        setCachedData(cacheKey, result, 60000); // 1 minute cache for searches
+      }
+      
+      return result;
     };
+
+    return await retryWithBackoff(searchOperation, 3, 1000);
   } catch (error) {
     log(`Failed to search files: ${error}`, 'error');
     throw new Error(`Failed to search files: ${error}`);
@@ -575,10 +675,15 @@ async function listFiles(args: z.infer<typeof ListFilesSchema>) {
       throw new Error('Google Drive API returned no data');
     }
 
+    // Handle different response structures
+    const files = Array.isArray(response.data.files) ? response.data.files : [];
+    
+    log(`Listed ${files.length} files`, 'info');
+    
     return {
-      files: response.data.files || [],
-      nextPageToken: response.data.nextPageToken,
-      totalResults: response.data.files?.length || 0,
+      files: files,
+      nextPageToken: response.data.nextPageToken || null,
+      totalResults: files.length,
     };
   } catch (error) {
     log(`Failed to list files: ${error}`, 'error');

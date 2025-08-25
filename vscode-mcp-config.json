@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "mcp-google-drive": {
+      "command": "npx",
+      "args": ["mcp-google-drive@latest"],
+      "env": {
+        "GOOGLE_SERVICE_ACCOUNT_KEY": "${GOOGLE_SERVICE_ACCOUNT_KEY}",
+        "LOG_LEVEL": "info"
+      },
+      "description": "Advanced Google Drive integration with full CRUD operations, search, and file management",
+      "features": [
+        "File search and retrieval",
+        "Upload and download files",
+        "Folder management", 
+        "File sharing and permissions",
+        "Google Workspace files support",
+        "Caching and performance optimization"
+      ],
+      "authentication": {
+        "type": "service_account",
+        "required_env": ["GOOGLE_SERVICE_ACCOUNT_KEY"],
+        "setup_instructions": "Set GOOGLE_SERVICE_ACCOUNT_KEY environment variable with your Google Service Account JSON credentials"
+      }
+    }
+  }
+}
