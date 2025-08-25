@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2024-12-19
+
+### Added
+- GitHub Release v1.2.0 with comprehensive release notes
+- Enhanced package metadata and npm discoverability
+- Improved documentation structure and organization
+
+### Changed
+- Updated package version to 1.3.0
+- Enhanced npm package information and keywords
+- Improved GitHub repository organization
+
+### Removed
+- Cleaned up unnecessary deployment and security documentation files
+- Removed unused configuration files to focus on core functionality
+- Streamlined project structure for better maintainability
+
+### Documentation
+- Added comprehensive release notes for v1.2.0
+- Enhanced package description and metadata
+- Updated all documentation links and references
+
 ## [1.2.0] - 2024-12-19
 
 ### Added
