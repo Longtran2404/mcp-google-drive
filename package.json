@@ -10,10 +10,6 @@
     "dev": "tsx src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepublishOnly": "npm run build",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix",
-    "format": "prettier --write src/**/*.ts",
-    "format:check": "prettier --check src/**/*.ts",
     "clean": "rimraf dist",
     "rebuild": "npm run clean && npm run build",
     "prepare": "npm run build"
