@@ -1,5 +1,5 @@
 {
-  "name": "@minhlong244/mcp-google-drive",
+  "name": "mcp-google-drive",
   "version": "1.1.0",
   "description": "Advanced MCP server for Google Drive integration with full CRUD operations, file management, and sharing capabilities",
   "main": "dist/index.js",

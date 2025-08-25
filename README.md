@@ -25,14 +25,14 @@ Advanced MCP (Model Context Protocol) server for Google Drive integration with f
 ## 🛠️ Installation
 
 ```bash
-npm install @minhlong244/mcp-google-drive
+npm install mcp-google-drive
 ```
 
 ## ⚙️ Quick Setup
 
 1. **Install the package:**
    ```bash
-   npm install @minhlong244/mcp-google-drive
+   npm install mcp-google-drive
    ```
 
 2. **Set up Google Service Account:**
