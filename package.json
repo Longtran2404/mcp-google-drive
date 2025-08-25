@@ -1,6 +1,6 @@
 {
   "name": "mcp-google-drive",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Advanced MCP server for Google Drive integration with full CRUD operations, file management, and sharing capabilities. Supports both OAuth2 and Service Account authentication.",
   "main": "dist/index.js",
   "type": "module",
