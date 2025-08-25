@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "mcp-google-drive": {
+      "command": "npx",
+      "args": ["mcp-google-drive@latest"],
+      "env": {
+        "GOOGLE_CLIENT_ID": "${GOOGLE_CLIENT_ID}",
+        "GOOGLE_CLIENT_SECRET": "${GOOGLE_CLIENT_SECRET}",
+        "GOOGLE_REDIRECT_URI": "http://localhost:3000/auth/google/callback",
+        "GDRIVE_CREDS_DIR": "${GDRIVE_CREDS_DIR}",
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "info"
+      },
+      "description": "Google Drive MCP Server for file operations using OAuth2 authentication",
+      "capabilities": [
+        "search_files - Search for files using Google Drive's powerful search syntax",
+        "get_file - Retrieve file metadata and content",
+        "list_files - List files with filtering and pagination", 
+        "create_file - Create new files in Google Drive",
+        "update_file - Update existing file content and metadata",
+        "delete_file - Delete or trash files",
+        "copy_file - Copy files to new locations",
+        "move_file - Move files between folders",
+        "create_folder - Create new folders",
+        "share_file - Share files with users and set permissions",
+        "get_file_permissions - View file permissions",
+        "get_drive_info - Get drive information",
+        "list_shared_drives - List available shared drives",
+        "get_file_revisions - View file revision history"
+      ],
+      "authentication": {
+        "type": "oauth2",
+        "required_env": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+        "optional_env": ["GDRIVE_CREDS_DIR", "GOOGLE_REDIRECT_URI"],
+        "setup_instructions": "Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables with your Google OAuth2 credentials"
+      }
+    }
+  }
+}
