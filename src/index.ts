@@ -1202,7 +1202,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
     }
     
     log(`Tool ${name} executed successfully`, 'debug');
-    return result;
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   } catch (error) {
     log(`Tool ${name} failed: ${error}`, 'error');
     throw new Error(`Tool execution failed: ${error}`);
