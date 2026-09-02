@@ -13,7 +13,7 @@ Thêm cấu hình sau vào file `~/.cursor/mcp.json`:
   "mcpServers": {
     "mcp-google-drive": {
       "command": "npx",
-      "args": ["mcp-google-drive@1.3.2"],
+      "args": ["mcp-google-drive@latest"],
       "env": {
         "GOOGLE_SERVICE_ACCOUNT_KEY": "your-service-account-json-here",
         "MCP_MODE": "stdio",
@@ -81,7 +81,7 @@ Thêm cấu hình sau vào file `~/.cursor/mcp.json`:
      "mcpServers": {
        "mcp-google-drive": {
          "command": "npx",
-         "args": ["mcp-google-drive@1.3.2"],
+         "args": ["mcp-google-drive@latest"],
          "env": {
            "GOOGLE_SERVICE_ACCOUNT_KEY": "your-credentials",
            "MCP_MODE": "stdio",

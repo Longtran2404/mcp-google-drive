@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] - 2026-09-02
+
+### Changed
+
+- Identified this package as an official TaskKit open-source project.
+- Aligned npm, GitHub, Founder, and canonical TaskKit links.
+- Updated the runtime MCP server version and installation example.
+- Updated the MCP and Google API dependencies to patched supported releases.
+- Required Node.js 20 or newer to match resolved runtime dependency requirements.
+- Added a credential-free MCP stdio initialize and tool-list smoke test to the release gate.
+- Normalized all tool responses to the MCP SDK `CallToolResult` contract, including safe binary
+  serialization and visible error content.
+- Made CI validation-only; npm publishing remains a manual, maintainer-controlled step.
+
 ## [1.3.3] - 2024-12-XX
 
 ### Added

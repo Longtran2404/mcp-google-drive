@@ -1,6 +1,8 @@
 # MCP Google Drive
 
-Advanced MCP server for Google Drive integration with full CRUD operations, file management, and sharing capabilities.
+Official open-source package in the [TaskKit](https://www.taskkit.vn) ecosystem, maintained by [Trần Minh Long](https://www.taskkit.vn/tran-minh-long). It provides an MCP server for Google Drive file search, management, sharing, and content operations.
+
+[TaskKit open-source catalog](https://www.taskkit.vn/ma-nguon-mo) · [npm](https://www.npmjs.com/package/mcp-google-drive) · [GitHub](https://github.com/Longtran2404/mcp-google-drive)
 
 ## ✨ Features
 
@@ -16,7 +18,7 @@ Advanced MCP server for Google Drive integration with full CRUD operations, file
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - Google Service Account with Drive API enabled
 - Service Account JSON key file
 
@@ -45,7 +47,7 @@ The MCP server is designed to work seamlessly with Cursor. Add this configuratio
   "mcpServers": {
     "mcp-google-drive": {
       "command": "npx",
-      "args": ["mcp-google-drive@1.3.2"],
+      "args": ["mcp-google-drive@latest"],
       "env": {
         "GOOGLE_SERVICE_ACCOUNT_KEY": "your-service-account-json",
         "MCP_MODE": "stdio",
@@ -106,7 +108,7 @@ npx mcp-google-drive
 
 - [Google Drive API Reference](https://developers.google.com/drive/api/reference/rest/v3)
 - [MCP Protocol Specification](https://modelcontextprotocol.io/)
-- [Service Account Setup Guide](./GOOGLE_SERVICE_ACCOUNT_SETUP.md)
+- [Service Account Setup Guide](https://github.com/Longtran2404/mcp-google-drive/blob/master/GOOGLE_SERVICE_ACCOUNT_SETUP.md)
 
 ## 🧪 Development
 
@@ -137,8 +139,14 @@ MIT License - see [LICENSE](./LICENSE) for details.
 
 Contributions welcome! Please read our contributing guidelines and submit pull requests.
 
+Release validation runs on Node.js 20 and 22. npm publication is performed manually from a
+maintainer-controlled authenticated session so that account and 2FA checks remain under the
+publisher's control.
+
 ## 📞 Support
 
 - **Issues**: [GitHub Issues](https://github.com/Longtran2404/mcp-google-drive/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/Longtran2404/mcp-google-drive/discussions)
-- **Documentation**: [README](./README.md) and [Setup Guide](./GOOGLE_SERVICE_ACCOUNT_SETUP.md)
+- **TaskKit**: [Official open-source catalog](https://www.taskkit.vn/ma-nguon-mo)
+- **Founder**: [Trần Minh Long](https://www.taskkit.vn/tran-minh-long)
+- **Documentation**: [README](./README.md) and [Setup Guide](https://github.com/Longtran2404/mcp-google-drive/blob/master/GOOGLE_SERVICE_ACCOUNT_SETUP.md)
