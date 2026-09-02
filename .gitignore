@@ -16,6 +16,15 @@ build/
 .env.test.local
 .env.production.local
 
+# Google OAuth and service-account credentials
+credentials.json
+token.json
+google-service-account-key.json
+client_secret*.json
+service-account*.json
+*.key
+*.pem
+
 # IDE files
 .vscode/
 .idea/
