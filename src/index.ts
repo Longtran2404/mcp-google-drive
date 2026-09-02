@@ -7,14 +7,29 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { google } from 'googleapis';
+import { drive_v3, google } from 'googleapis';
 import { z } from 'zod';
+import { runCallToolOperation } from './mcp-result.js';
+
+type ErrorDetails = {
+  code?: number;
+  message?: string;
+};
+
+type ServiceAccountCredentials = {
+  client_email: string;
+  private_key: string;
+};
+
+function getErrorDetails(error: unknown): ErrorDetails {
+  return typeof error === 'object' && error !== null ? (error as ErrorDetails) : {};
+}
 
 // Enhanced logging
 const log = (message: string, level: 'info' | 'error' | 'debug' = 'info') => {
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] [${level.toUpperCase()}] MCP-Google-Drive: ${message}`;
-  
+
   if (level === 'error') {
     console.error(logMessage);
   } else if (process.env.LOG_LEVEL === 'debug' || level === 'info') {
@@ -23,8 +38,8 @@ const log = (message: string, level: 'info' | 'error' | 'debug' = 'info') => {
 };
 
 // Google Drive API setup with enhanced error handling
-let auth: any;
-let drive: any;
+let auth: drive_v3.Options['auth'];
+let drive: drive_v3.Drive;
 let isInitialized = false;
 
 // Retry utility with exponential backoff
@@ -36,22 +51,33 @@ async function retryWithBackoff<T>(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (attempt === maxRetries) {
         throw error;
       }
 
+      const errorDetails = getErrorDetails(error);
+
       // Check if error is retryable (rate limits, network issues)
-      const isRetryable = error.code === 403 || error.code === 429 || error.code === 500 || 
-                         error.code === 502 || error.code === 503 || error.code === 504 ||
-                         error.message?.includes('rate limit') || error.message?.includes('quota');
+      const isRetryable =
+        errorDetails.code === 403 ||
+        errorDetails.code === 429 ||
+        errorDetails.code === 500 ||
+        errorDetails.code === 502 ||
+        errorDetails.code === 503 ||
+        errorDetails.code === 504 ||
+        errorDetails.message?.includes('rate limit') ||
+        errorDetails.message?.includes('quota');
 
       if (!isRetryable) {
         throw error;
       }
 
       const delay = initialDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
-      log(`Attempt ${attempt} failed, retrying in ${Math.round(delay)}ms: ${error.message}`, 'debug');
+      log(
+        `Attempt ${attempt} failed, retrying in ${Math.round(delay)}ms: ${errorDetails.message ?? String(error)}`,
+        'debug'
+      );
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -59,36 +85,36 @@ async function retryWithBackoff<T>(
 }
 
 // Simple in-memory cache for frequently accessed data
-const cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+const cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>();
 
-function getCachedData(key: string): any | null {
+function getCachedData<T>(key: string): T | null {
   const cached = cache.get(key);
   if (!cached) return null;
-  
+
   if (Date.now() - cached.timestamp > cached.ttl) {
     cache.delete(key);
     return null;
   }
-  
-  return cached.data;
+
+  return cached.data as T;
 }
 
-function setCachedData(key: string, data: any, ttl: number = 300000): void { // 5 minutes default
+function setCachedData(key: string, data: unknown, ttl: number = 300000): void {
   cache.set(key, {
     data,
     timestamp: Date.now(),
-    ttl
+    ttl,
   });
 }
 
 function initializeGoogleAuth() {
   try {
     log('Initializing Google Drive authentication...', 'debug');
-    
+
     // Check if OAuth2 credentials are provided
     if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       log('Using OAuth2 authentication...', 'info');
-      
+
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
@@ -97,7 +123,7 @@ function initializeGoogleAuth() {
 
       if (process.env.GOOGLE_REFRESH_TOKEN) {
         oauth2Client.setCredentials({
-          refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+          refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
         });
         auth = oauth2Client;
         log('OAuth2 authentication configured with refresh token', 'info');
@@ -107,29 +133,39 @@ function initializeGoogleAuth() {
       }
     } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
       log('Using Service Account authentication...', 'info');
-      
-      let credentials;
+
+      let credentials: ServiceAccountCredentials;
       try {
         // Try to parse as JSON if it's a JSON string
         const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-        
+
         // Handle escaped newlines in private key
         const cleanedKey = serviceAccountKey.replace(/\\n/g, '\n');
-        credentials = JSON.parse(cleanedKey);
-        
+        const parsedCredentials: unknown = JSON.parse(cleanedKey);
+
         log('Successfully parsed Service Account credentials as JSON', 'debug');
-        
+
         // Validate credentials structure
-        if (!credentials.private_key || !credentials.client_email) {
+        if (
+          typeof parsedCredentials !== 'object' ||
+          parsedCredentials === null ||
+          !('private_key' in parsedCredentials) ||
+          typeof parsedCredentials.private_key !== 'string' ||
+          parsedCredentials.private_key.length === 0 ||
+          !('client_email' in parsedCredentials) ||
+          typeof parsedCredentials.client_email !== 'string' ||
+          parsedCredentials.client_email.length === 0
+        ) {
           throw new Error('Invalid Service Account credentials structure');
         }
-        
+
+        credentials = parsedCredentials as ServiceAccountCredentials;
+
         // Ensure private key is properly formatted
         if (!credentials.private_key.includes('-----BEGIN PRIVATE KEY-----')) {
           throw new Error('Invalid private key format');
         }
-        
-      } catch (parseError) {
+      } catch {
         log('Failed to parse Service Account credentials as JSON, treating as file path', 'debug');
         // If parsing fails, treat as file path
         auth = new google.auth.GoogleAuth({
@@ -144,9 +180,9 @@ function initializeGoogleAuth() {
         log('Google Drive API initialized successfully with keyFile', 'info');
         return;
       }
-      
+
       auth = new google.auth.GoogleAuth({
-        credentials: credentials,
+        credentials,
         scopes: [
           'https://www.googleapis.com/auth/drive.readonly',
           'https://www.googleapis.com/auth/drive.metadata.readonly',
@@ -154,7 +190,9 @@ function initializeGoogleAuth() {
         ],
       });
     } else {
-      throw new Error('No authentication credentials provided. Please set either GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or GOOGLE_SERVICE_ACCOUNT_KEY');
+      throw new Error(
+        'No authentication credentials provided. Please set either GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or GOOGLE_SERVICE_ACCOUNT_KEY'
+      );
     }
 
     log('Google Drive authentication configured successfully', 'info');
@@ -544,113 +582,227 @@ const tools: Tool[] = [
 // Vietnamese text normalization utilities
 function removeVietnameseDiacritics(str: string): string {
   const map: { [key: string]: string } = {
-    'à': 'a', 'á': 'a', 'ạ': 'a', 'ả': 'a', 'ã': 'a',
-    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ậ': 'a', 'ẩ': 'a', 'ẫ': 'a',
-    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ặ': 'a', 'ẳ': 'a', 'ẵ': 'a',
-    'è': 'e', 'é': 'e', 'ẹ': 'e', 'ẻ': 'e', 'ẽ': 'e',
-    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ệ': 'e', 'ể': 'e', 'ễ': 'e',
-    'ì': 'i', 'í': 'i', 'ị': 'i', 'ỉ': 'i', 'ĩ': 'i',
-    'ò': 'o', 'ó': 'o', 'ọ': 'o', 'ỏ': 'o', 'õ': 'o',
-    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ộ': 'o', 'ổ': 'o', 'ỗ': 'o',
-    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ợ': 'o', 'ở': 'o', 'ỡ': 'o',
-    'ù': 'u', 'ú': 'u', 'ụ': 'u', 'ủ': 'u', 'ũ': 'u',
-    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ự': 'u', 'ử': 'u', 'ữ': 'u',
-    'ỳ': 'y', 'ý': 'y', 'ỵ': 'y', 'ỷ': 'y', 'ỹ': 'y',
-    'đ': 'd',
-    'À': 'A', 'Á': 'A', 'Ạ': 'A', 'Ả': 'A', 'Ã': 'A',
-    'Â': 'A', 'Ầ': 'A', 'Ấ': 'A', 'Ậ': 'A', 'Ẩ': 'A', 'Ẫ': 'A',
-    'Ă': 'A', 'Ằ': 'A', 'Ắ': 'A', 'Ặ': 'A', 'Ẳ': 'A', 'Ẵ': 'A',
-    'È': 'E', 'É': 'E', 'Ẹ': 'E', 'Ẻ': 'E', 'Ẽ': 'E',
-    'Ê': 'E', 'Ề': 'E', 'Ế': 'E', 'Ệ': 'E', 'Ể': 'E', 'Ễ': 'E',
-    'Ì': 'I', 'Í': 'I', 'Ị': 'I', 'Ỉ': 'I', 'Ĩ': 'I',
-    'Ò': 'O', 'Ó': 'O', 'Ọ': 'O', 'Ỏ': 'O', 'Õ': 'O',
-    'Ô': 'O', 'Ồ': 'O', 'Ố': 'O', 'Ộ': 'O', 'Ổ': 'O', 'Ỗ': 'O',
-    'Ơ': 'O', 'Ờ': 'O', 'Ớ': 'O', 'Ợ': 'O', 'Ở': 'O', 'Ỡ': 'O',
-    'Ù': 'U', 'Ú': 'U', 'Ụ': 'U', 'Ủ': 'U', 'Ũ': 'U',
-    'Ư': 'U', 'Ừ': 'U', 'Ứ': 'U', 'Ự': 'U', 'Ử': 'U', 'Ữ': 'U',
-    'Ỳ': 'Y', 'Ý': 'Y', 'Ỵ': 'Y', 'Ỷ': 'Y', 'Ỹ': 'Y',
-    'Đ': 'D'
+    à: 'a',
+    á: 'a',
+    ạ: 'a',
+    ả: 'a',
+    ã: 'a',
+    â: 'a',
+    ầ: 'a',
+    ấ: 'a',
+    ậ: 'a',
+    ẩ: 'a',
+    ẫ: 'a',
+    ă: 'a',
+    ằ: 'a',
+    ắ: 'a',
+    ặ: 'a',
+    ẳ: 'a',
+    ẵ: 'a',
+    è: 'e',
+    é: 'e',
+    ẹ: 'e',
+    ẻ: 'e',
+    ẽ: 'e',
+    ê: 'e',
+    ề: 'e',
+    ế: 'e',
+    ệ: 'e',
+    ể: 'e',
+    ễ: 'e',
+    ì: 'i',
+    í: 'i',
+    ị: 'i',
+    ỉ: 'i',
+    ĩ: 'i',
+    ò: 'o',
+    ó: 'o',
+    ọ: 'o',
+    ỏ: 'o',
+    õ: 'o',
+    ô: 'o',
+    ồ: 'o',
+    ố: 'o',
+    ộ: 'o',
+    ổ: 'o',
+    ỗ: 'o',
+    ơ: 'o',
+    ờ: 'o',
+    ớ: 'o',
+    ợ: 'o',
+    ở: 'o',
+    ỡ: 'o',
+    ù: 'u',
+    ú: 'u',
+    ụ: 'u',
+    ủ: 'u',
+    ũ: 'u',
+    ư: 'u',
+    ừ: 'u',
+    ứ: 'u',
+    ự: 'u',
+    ử: 'u',
+    ữ: 'u',
+    ỳ: 'y',
+    ý: 'y',
+    ỵ: 'y',
+    ỷ: 'y',
+    ỹ: 'y',
+    đ: 'd',
+    À: 'A',
+    Á: 'A',
+    Ạ: 'A',
+    Ả: 'A',
+    Ã: 'A',
+    Â: 'A',
+    Ầ: 'A',
+    Ấ: 'A',
+    Ậ: 'A',
+    Ẩ: 'A',
+    Ẫ: 'A',
+    Ă: 'A',
+    Ằ: 'A',
+    Ắ: 'A',
+    Ặ: 'A',
+    Ẳ: 'A',
+    Ẵ: 'A',
+    È: 'E',
+    É: 'E',
+    Ẹ: 'E',
+    Ẻ: 'E',
+    Ẽ: 'E',
+    Ê: 'E',
+    Ề: 'E',
+    Ế: 'E',
+    Ệ: 'E',
+    Ể: 'E',
+    Ễ: 'E',
+    Ì: 'I',
+    Í: 'I',
+    Ị: 'I',
+    Ỉ: 'I',
+    Ĩ: 'I',
+    Ò: 'O',
+    Ó: 'O',
+    Ọ: 'O',
+    Ỏ: 'O',
+    Õ: 'O',
+    Ô: 'O',
+    Ồ: 'O',
+    Ố: 'O',
+    Ộ: 'O',
+    Ổ: 'O',
+    Ỗ: 'O',
+    Ơ: 'O',
+    Ờ: 'O',
+    Ớ: 'O',
+    Ợ: 'O',
+    Ở: 'O',
+    Ỡ: 'O',
+    Ù: 'U',
+    Ú: 'U',
+    Ụ: 'U',
+    Ủ: 'U',
+    Ũ: 'U',
+    Ư: 'U',
+    Ừ: 'U',
+    Ứ: 'U',
+    Ự: 'U',
+    Ử: 'U',
+    Ữ: 'U',
+    Ỳ: 'Y',
+    Ý: 'Y',
+    Ỵ: 'Y',
+    Ỷ: 'Y',
+    Ỹ: 'Y',
+    Đ: 'D',
   };
-  
-  return str.replace(/[^\u0000-\u007E]/g, (char) => map[char] || char);
+
+  return Array.from(str, char => (char.codePointAt(0)! <= 0x7e ? char : map[char] || char)).join(
+    ''
+  );
 }
 
 function generateSearchVariations(searchTerm: string): string[] {
   const variations = new Set<string>();
-  
+
   // Original term
   variations.add(searchTerm);
-  
+
   // Case variations
   variations.add(searchTerm.toLowerCase());
   variations.add(searchTerm.toUpperCase());
   variations.add(searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1).toLowerCase());
-  
+
   // Without diacritics
   const withoutDiacritics = removeVietnameseDiacritics(searchTerm);
   variations.add(withoutDiacritics);
   variations.add(withoutDiacritics.toLowerCase());
   variations.add(withoutDiacritics.toUpperCase());
-  
+
   // Split terms for partial matching
   const words = searchTerm.split(/[\s\-_]+/).filter(w => w.length > 1);
   words.forEach(word => {
     variations.add(word);
     variations.add(removeVietnameseDiacritics(word));
   });
-  
+
   return Array.from(variations);
 }
 
 async function searchFiles(args: z.infer<typeof SearchFilesSchema>) {
   try {
     log(`Searching files with args: ${JSON.stringify(args)}`, 'debug');
-    
+
     // Check if the query looks like a file ID (length ~44 chars, alphanumeric with hyphens/underscores)
     const fileIdPattern = /^[a-zA-Z0-9_-]{25,}$/;
     if (fileIdPattern.test(args.query.trim())) {
       log(`Query "${args.query}" looks like a file ID, attempting direct access`, 'info');
-      
+
       try {
         const fileResponse = await drive.files.get({
           fileId: args.query.trim(),
-          fields: 'id,name,mimeType,modifiedTime,size,webViewLink,parents,description,owners,permissions',
+          fields:
+            'id,name,mimeType,modifiedTime,size,webViewLink,parents,description,owners,permissions',
           supportsAllDrives: true,
         });
-        
+
         if (fileResponse.data) {
           log(`Successfully found file by ID: ${fileResponse.data.name}`, 'info');
-          
+
           return {
             files: [fileResponse.data],
             nextPageToken: null,
             totalResults: 1,
             query: args.query,
             cached: false,
-            foundByFileId: true
+            foundByFileId: true,
           };
         }
       } catch (fileIdError) {
         log(`File ID access failed, falling back to search: ${fileIdError}`, 'debug');
       }
     }
-    
+
     // Create cache key
     const cacheKey = `search:${JSON.stringify(args)}`;
-    
+
     // Check cache first for non-real-time queries
     const cachedResult = getCachedData(cacheKey);
     if (cachedResult && !args.query.includes('modifiedTime')) {
       log('Returning cached search result', 'debug');
       return cachedResult;
     }
-    
+
     // Generate search variations for Vietnamese text
     const searchVariations = generateSearchVariations(args.query);
-    log(`Generated ${searchVariations.length} search variations: ${searchVariations.join(', ')}`, 'debug');
-    
-    let allFoundFiles = new Map<string, any>(); // Use Map to avoid duplicates by ID
-    
+    log(
+      `Generated ${searchVariations.length} search variations: ${searchVariations.join(', ')}`,
+      'debug'
+    );
+
+    const allFoundFiles = new Map<string, drive_v3.Schema$File>(); // Use Map to avoid duplicates by ID
+
     // Try multiple search approaches
     const searchApproaches = [
       // Exact matches with variations
@@ -658,9 +810,9 @@ async function searchFiles(args: z.infer<typeof SearchFilesSchema>) {
       // Partial matches
       ...searchVariations.map(term => `fullText contains "${term}"`),
       // Without case sensitivity (Google Drive handles this automatically)
-      ...searchVariations.slice(0, 3).map(term => `name = "${term}"`)
+      ...searchVariations.slice(0, 3).map(term => `name = "${term}"`),
     ];
-    
+
     // Add file type and trash filters to all approaches
     const baseFilters: string[] = [];
     if (!args.includeTrashed) {
@@ -669,44 +821,43 @@ async function searchFiles(args: z.infer<typeof SearchFilesSchema>) {
     if (args.fileType) {
       baseFilters.push(`mimeType='${args.fileType}'`);
     }
-    
+
     const searchOperation = async () => {
       // Try each search approach
-      for (let i = 0; i < Math.min(searchApproaches.length, 5); i++) { // Limit to prevent too many API calls
+      for (let i = 0; i < Math.min(searchApproaches.length, 5); i++) {
+        // Limit to prevent too many API calls
         const searchQuery = searchApproaches[i];
-        const fullQuery = baseFilters.length > 0 
-          ? `${searchQuery} and ${baseFilters.join(' and ')}`
-          : searchQuery;
-          
+        const fullQuery =
+          baseFilters.length > 0 ? `${searchQuery} and ${baseFilters.join(' and ')}` : searchQuery;
+
         log(`Trying search query ${i + 1}: ${fullQuery}`, 'debug');
-        
+
         try {
           const response = await drive.files.list({
             q: fullQuery,
             pageSize: args.maxResults || 20,
-            fields: 'files(id,name,mimeType,modifiedTime,size,webViewLink,parents,description,owners,permissions),nextPageToken',
+            fields:
+              'files(id,name,mimeType,modifiedTime,size,webViewLink,parents,description,owners,permissions),nextPageToken',
             orderBy: args.orderBy || 'modifiedTime desc',
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
           });
 
           if (response.data?.files && Array.isArray(response.data.files)) {
-            response.data.files.forEach((file: any) => {
-              if (!allFoundFiles.has(file.id)) {
+            response.data.files.forEach(file => {
+              if (file.id && !allFoundFiles.has(file.id)) {
                 allFoundFiles.set(file.id, file);
               }
             });
-            
+
             log(`Search query ${i + 1} found ${response.data.files.length} files`, 'debug');
-            
+
             // If we found files and they seem relevant, we can break early
             if (response.data.files.length > 0) {
-              const relevantFiles = response.data.files.filter((file: any) => 
-                searchVariations.some(term => 
-                  file.name.toLowerCase().includes(term.toLowerCase())
-                )
+              const relevantFiles = response.data.files.filter(file =>
+                searchVariations.some(term => file.name?.toLowerCase().includes(term.toLowerCase()))
               );
-              
+
               if (relevantFiles.length > 0) {
                 log(`Found ${relevantFiles.length} highly relevant files, stopping search`, 'info');
                 break;
@@ -723,19 +874,19 @@ async function searchFiles(args: z.infer<typeof SearchFilesSchema>) {
       log(`Total unique files found across all searches: ${files.length}`, 'info');
 
       const result = {
-        files: files,
+        files,
         nextPageToken: null, // We're combining results, so no pagination token
         totalResults: files.length,
         query: args.query,
-        searchVariations: searchVariations,
-        cached: false
+        searchVariations,
+        cached: false,
       };
 
       // Cache the result if successful
       if (files.length >= 0) {
         setCachedData(cacheKey, result, 60000); // 1 minute cache for searches
       }
-      
+
       return result;
     };
 
@@ -786,7 +937,7 @@ async function getFile(args: z.infer<typeof GetFileSchema>) {
 async function listFiles(args: z.infer<typeof ListFilesSchema>) {
   try {
     log(`Listing files with args: ${JSON.stringify(args)}`, 'debug');
-    
+
     const response = await drive.files.list({
       pageSize: args.pageSize,
       pageToken: args.pageToken,
@@ -807,11 +958,11 @@ async function listFiles(args: z.infer<typeof ListFilesSchema>) {
 
     // Handle different response structures
     const files = Array.isArray(response.data.files) ? response.data.files : [];
-    
+
     log(`Listed ${files.length} files`, 'info');
-    
+
     return {
-      files: files,
+      files,
       nextPageToken: response.data.nextPageToken || null,
       totalResults: files.length,
     };
@@ -1116,13 +1267,17 @@ async function getFileRevisions(args: z.infer<typeof GetFileRevisionsSchema>) {
 }
 
 // MCP Server setup with enhanced error handling
-const server = new Server({
-  name: 'mcp-google-drive-server',
-  version: '1.4.1',
-  capabilities: {
-    tools: {},
+const server = new Server(
+  {
+    name: 'mcp-google-drive-server',
+    version: '1.6.3',
   },
-});
+  {
+    capabilities: {
+      tools: {},
+    },
+  }
+);
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   log('ListTools request received', 'debug');
@@ -1132,24 +1287,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async request => {
   const { name, arguments: args } = request.params;
 
-  // Check if authentication is ready
-  if (!isInitialized) {
-    log('Authentication not ready, waiting...', 'debug');
-    // Wait for authentication to complete
-    let waitCount = 0;
-    while (!isInitialized && waitCount < 30) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      waitCount++;
-    }
-    
+  const response = await runCallToolOperation(name, async () => {
+    // Check if authentication is ready
     if (!isInitialized) {
-      throw new Error('Authentication not ready after 3 seconds');
+      log('Authentication not ready, waiting...', 'debug');
+      // Wait for authentication to complete
+      let waitCount = 0;
+      while (!isInitialized && waitCount < 30) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        waitCount++;
+      }
+
+      if (!isInitialized) {
+        throw new Error('Authentication not ready after 3 seconds');
+      }
     }
-  }
 
-  log(`Tool call: ${name}`, 'debug');
+    log(`Tool call: ${name}`, 'debug');
 
-  try {
     let result;
     switch (name) {
       case 'search_files':
@@ -1200,20 +1355,24 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
-    
+
     log(`Tool ${name} executed successfully`, 'debug');
     return result;
-  } catch (error) {
-    log(`Tool ${name} failed: ${error}`, 'error');
-    throw new Error(`Tool execution failed: ${error}`);
+  });
+
+  if (response.isError) {
+    const errorText = response.content.find(item => item.type === 'text')?.text ?? 'Unknown error';
+    log(errorText, 'error');
   }
+
+  return response;
 });
 
 // Start server with error handling
 try {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  
+
   log('MCP Google Drive server started successfully', 'info');
   log('Server ready to handle requests', 'info');
 } catch (error) {
