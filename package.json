@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "mcp-google-drive": "./dist/index.js"
+    "mcp-google-drive": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -14,7 +14,7 @@
     "test": "npm run build && npm run test:contract && npm run test:smoke",
     "test:contract": "node test/mcp-call-tool-contract.mjs",
     "test:smoke": "node test/mcp-stdio-smoke.mjs",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run lint && npm run format:check && npm test && npm audit --omit=dev --audit-level=high",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.mjs\"",
     "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.mjs\" --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.mjs\"",
@@ -48,7 +48,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Longtran2404/mcp-google-drive.git"
+    "url": "git+https://github.com/Longtran2404/mcp-google-drive.git"
   },
   "bugs": {
     "url": "https://github.com/Longtran2404/mcp-google-drive/issues"
